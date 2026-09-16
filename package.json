@@ -1,7 +1,11 @@
 {
   "name": "codex-muse-bridge",
   "version": "0.1.0",
-  "description": "A small browser-mediated Codex to Muse bridge",
+  "description": "Let Codex collaborate with Muse through your existing browser session",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/cherry-nft/codex-muse-bridge.git" },
+  "homepage": "https://github.com/cherry-nft/codex-muse-bridge#readme",
+  "bugs": { "url": "https://github.com/cherry-nft/codex-muse-bridge/issues" },
   "private": true,
   "main": "scripts/muse-bridge.cjs",
   "scripts": { "test": "node --test test/*.test.cjs" },

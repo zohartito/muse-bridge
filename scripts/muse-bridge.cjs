@@ -48,23 +48,37 @@ function createMuseBridge(tab, options = {}) {
   const seen = new Map(previous.seen || []);
   let pending = previous.pending || null;
   let afterUserId = previous.afterUserId || null;
+  let provisionalSend = previous.provisionalSend || null;
   let sending = false;
   const sleep = options.sleep || (ms => new Promise(resolve => setTimeout(resolve, ms)));
   const now = options.now || Date.now;
 
   function checkpoint() {
-    return { version: 1, url, seen: Array.from(seen), afterUserId, pending };
+    return { version: 1, url, seen: Array.from(seen), afterUserId, pending, provisionalSend };
   }
 
   async function snapshot() {
     const current = museThreadURL(await tab.url());
-    if (url && current !== url) throw new Error('Conversation changed; attach a new bridge for that thread.');
-    url = current;
+    const changed = url && current !== url;
+    const adopting = changed && url === 'https://muse.ai/thread/new' && provisionalSend;
+    if (changed && !adopting) throw new Error('Conversation changed; attach a new bridge for that thread.');
     const state = await tab.playwright.evaluate(readMuseDOM);
     if (!state.ready) throw new Error('Muse chat is not ready. Inspect the page for connection or sign-in.');
     if (state.messages.some(m => !m.id || !['user', 'assistant', 'system', 'tool'].includes(m.role))) {
       throw new Error('Muse message structure changed. Inspect the chat before continuing.');
     }
+    if (adopting) {
+      // Muse assigns a permanent URL after the first send. Match that send in
+      // the visible log before accepting the transition, including changed IDs.
+      const users = state.messages.filter(m => m.role === 'user');
+      if (state.messages[0]?.role !== 'user' || users.length !== 1 ||
+          museFingerprint(users[0].text.trim()) !== provisionalSend.fingerprint) {
+        throw new Error('Conversation changed; attach a new bridge for that thread.');
+      }
+      afterUserId = users[0].id;
+      provisionalSend = null;
+    }
+    url = current;
     return state;
   }
 
@@ -110,8 +124,12 @@ function createMuseBridge(tab, options = {}) {
       const before = await snapshot();
       if (before.hasDraft) throw new Error('The composer contains a draft; leave it intact.');
       if (before.generating || !before.composerEnabled) throw new Error('Muse is busy; read or wait first.');
+      if (url === 'https://muse.ai/thread/new' && before.messages.length) {
+        throw new Error('Wait for Muse to assign a permanent conversation URL before sending again.');
+      }
       consume(before);
       pending = { fingerprint: museFingerprint(text.trim()), afterId: before.messages.at(-1)?.id || null };
+      if (url === 'https://muse.ai/thread/new') provisionalSend = { fingerprint: pending.fingerprint };
       const composer = tab.playwright.getByRole('textbox', { name: 'Message', exact: true });
       try {
         await composer.fill(text);

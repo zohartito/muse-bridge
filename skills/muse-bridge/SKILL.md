@@ -18,11 +18,13 @@ The optional helper [../../scripts/muse-bridge.cjs](../../scripts/muse-bridge.cj
 ```js
 var bridge = createMuseBridge(tab);
 await bridge.read();                 // first read establishes the baseline
-await bridge.send(message);          // one visible Muse user message
-await bridge.wait({timeoutMs: 20000});
+var delivery = await bridge.send(message); // one visible Muse user message
+if (delivery.status === 'sent') await bridge.wait({timeoutMs: 20000});
 ```
 
 `findMuseChats(browser, query)` filters open Muse tabs. It does not search all account history. Keep the tab handle in the REPL; if it expires, reacquire the same observed URL using the host's current tools.
+
+For a new conversation, use the visible **New side chat** control. An empty chat initially has `/thread/new` as its path. The helper supports its one-time transition to a permanent thread URL only after matching the first sent message in the visible log. Wait for that assignment before sending again. Any other conversation change requires inspection and a fresh bridge.
 
 ## Read, send, wait
 

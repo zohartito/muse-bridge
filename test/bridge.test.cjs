@@ -23,6 +23,7 @@ function fixture(initial = []) {
             assert.equal(key, 'Enter'); state.presses++;
             model.messages.push(message(`u${state.presses}`, 'user', draft));
             if (state.immediateReply) model.messages.push(message('instant', 'assistant', 'Done.'));
+            if (state.navigateAfterSend) state.url = state.navigateAfterSend;
             if (state.loseAck) throw Error('acknowledgement lost after send');
           }
         };
@@ -120,4 +121,68 @@ test('missing history and other writers cannot be mistaken for our reply', async
   assert.equal((await s.bridge.wait({timeoutMs:0})).status, 'history_gap');
   s.model.messages = [message('u1','user','Review'), message('u2','user','Someone else'), message('a','assistant','Their reply')];
   assert.equal((await s.bridge.wait({timeoutMs:0})).status, 'conversation_changed');
+});
+
+test('new chat adopts its permanent URL before delivery acknowledgement', async () => {
+  const s = fixture(); s.url = 'https://muse.ai/thread/new';
+  s.navigateAfterSend = URL; s.immediateReply = true;
+  assert.equal((await s.bridge.send('Hello')).status, 'sent');
+  const reply = await s.bridge.wait({timeoutMs:0});
+  assert.equal(reply.status, 'reply');
+  assert.equal(reply.messages[0].text, 'Done.');
+  assert.equal(reply.checkpoint.url, URL);
+  assert.equal(s.presses, 1);
+});
+
+test('new chat adopts its permanent URL after acknowledgement and updates the message anchor', async () => {
+  const s = fixture(); s.url = 'https://muse.ai/thread/new';
+  assert.equal((await s.bridge.send('Hello')).status, 'sent');
+  s.url = URL;
+  s.model.messages[0].id = 'persisted-user';
+  s.model.messages.push(message('reply', 'assistant', 'Hi'));
+  const reply = await s.bridge.wait({timeoutMs:0});
+  assert.equal(reply.status, 'reply');
+  assert.equal(reply.messages[0].text, 'Hi');
+  assert.equal(reply.checkpoint.afterUserId, 'persisted-user');
+  assert.equal(reply.checkpoint.provisionalSend, null);
+  s.url = 'https://muse.ai/thread/another';
+  await assert.rejects(() => s.bridge.read(), /Conversation changed/);
+  assert.equal(s.presses, 1);
+});
+
+test('new chat adoption requires our first message and no other user messages', async () => {
+  for (const messages of [
+    [],
+    [message('other', 'user', 'Unrelated')],
+    [message('a', 'assistant', 'Old history'), message('u', 'user', 'Hello')],
+    [message('u', 'user', 'Hello'), message('other', 'user', 'More work')]
+  ]) {
+    const s = fixture(); s.url = 'https://muse.ai/thread/new';
+    await s.bridge.send('Hello'); s.url = URL; s.model.messages = messages;
+    await assert.rejects(() => s.bridge.read(), /Conversation changed/);
+    assert.equal(s.bridge.checkpoint().url, 'https://muse.ai/thread/new');
+    assert.equal(s.presses, 1);
+  }
+});
+
+test('new chat cannot adopt a thread without a send or send again before assignment', async () => {
+  const s = fixture(); s.url = 'https://muse.ai/thread/new';
+  await s.bridge.read(); s.url = URL;
+  await assert.rejects(() => s.bridge.read(), /Conversation changed/);
+  s.url = 'https://muse.ai/thread/new';
+  await s.bridge.send('Hello');
+  await assert.rejects(() => s.bridge.send('Another message'), /permanent conversation URL/);
+  assert.equal(s.presses, 1);
+});
+
+test('new chat checkpoint can recover uncertain delivery across URL assignment', async () => {
+  const s = fixture(); s.url = 'https://muse.ai/thread/new'; s.failFill = true;
+  const delivery = await s.bridge.send('Unique greeting');
+  assert.equal(delivery.status, 'uncertain');
+  assert.ok(!JSON.stringify(delivery.checkpoint).includes('Unique greeting'));
+  s.url = URL; s.model.messages = [message('u', 'user', 'Unique greeting'), message('a', 'assistant', 'Hi')];
+  const restored = createMuseBridge(s.tab, {checkpoint:delivery.checkpoint});
+  assert.equal((await restored.checkDelivery()).status, 'sent');
+  assert.equal((await restored.wait({timeoutMs:0})).status, 'reply');
+  assert.equal(s.presses, 0);
 });
