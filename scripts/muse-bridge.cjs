@@ -26,7 +26,10 @@ function readMuseDOM() {
     role: el.getAttribute('data-message-role'),
     turnId: el.getAttribute('data-message-turn-id'),
     text: el.getAttribute('data-message-role') === 'user' ? el.innerText.replace(/^You:\s*/, '') : el.innerText,
-    busy: !!el.querySelector('[aria-busy="true"]'),
+    // Link-preview spans keep aria-busy="true" forever; only count busy markers
+    // that are not link previews (a URL-only span or anything inside/around an anchor).
+    busy: Array.from(el.querySelectorAll('[aria-busy="true"]')).some(marker =>
+      !marker.closest('a') && !marker.querySelector('a') && !/^https?:\/\/\S+$/.test(marker.innerText.trim())),
     links: Array.from(el.querySelectorAll('a[href]')).map(a => ({ text: a.innerText, url: a.href }))
   }));
   const stop = Array.from(document.querySelectorAll('button')).some(button =>

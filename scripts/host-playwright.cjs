@@ -59,13 +59,30 @@ async function pageLooksSignedOut(page) {
   }).catch(() => false);
 }
 
+/* Muse shows a "<agent> is connecting" status right after load; messages sent or
+ * read before it clears can be missed or re-identified. Best effort, bounded. */
+async function waitForConnection(page, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const connecting = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('[role="status"]')).some(el =>
+        /\bconnecting\b|loading chat/i.test(el.innerText || el.getAttribute('aria-label') || '')),
+    ).catch(() => false);
+    if (!connecting) return;
+    await page.waitForTimeout(300);
+  }
+}
+
 async function waitForChat(page, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const ready = await page.evaluate(([log, composer]) =>
       !!document.querySelector(log) && !!document.querySelector(composer),
     [LOG_SELECTOR, COMPOSER_SELECTOR]).catch(() => false);
-    if (ready) return true;
+    if (ready) {
+      await waitForConnection(page, Math.min(10000, Math.max(0, deadline - Date.now())));
+      return true;
+    }
     if (await pageLooksSignedOut(page)) throw new NeedsLoginError(page.url());
     await page.waitForTimeout(500);
   }
