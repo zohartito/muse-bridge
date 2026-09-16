@@ -44,6 +44,8 @@ muse new  "Hello Muse, this is a dedicated agent side chat." --timeout 120
 - `wait` returns `reply` (new assistant text, generation stopped), `waiting` (timeout hit, partial text included), `history_gap` or `conversation_changed` (re-read before continuing). A `reply` is not proof the task is done — read the text. "I'll push when finished" is an acknowledgement; call `wait` again later.
 - Muse coding sessions run for many minutes. Prefer `send` + repeated `wait` (each under your tool timeout) over one huge `ask`. The MCP `timeout` argument is in seconds and defaults to 90.
 - Keep one writer per conversation. Do not send while `generating` is true.
+- **One task in flight per thread.** Muse folds a second message into the task it is already running. Observed 2026-09-15: a "reply pong" connectivity ping sent while a fix round was queued became the task "Fix R10-R14 and reply pong"; Muse answered "pong" and logged the fixes as not implemented. While Muse is working, only `wait` and `read`. Put pings and unrelated questions in a separate side chat (`muse new`).
+- Muse's chat goes quiet while it works; its activity panel (right side) is where progress shows. A long silence with no reply is normal for a build round. Check the repo for pushed commits before assuming it stalled.
 
 ## Judging Muse's output
 
