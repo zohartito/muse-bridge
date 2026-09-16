@@ -50,6 +50,9 @@ async function waitLoop(bridge, { timeoutMs = 600000, intervalMs = 1000, tab = n
       bridge = await reanchor(tab, bridge);
       continue;
     }
+    // Lazily loaded history and streaming placeholders surface as assistant
+    // messages with no text yet; they are not a reply. Keep waiting for text.
+    if (last.status === 'reply' && !(last.messages || []).some(m => (m.text || '').trim())) continue;
     if (last.status !== 'waiting') break;
   } while (Date.now() < deadline);
   return last;
