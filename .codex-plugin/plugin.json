@@ -1,0 +1,16 @@
+{
+  "name": "codex-muse-bridge",
+  "version": "0.1.0",
+  "description": "Read and message Muse through the user's signed-in browser.",
+  "author": { "name": "Codex Muse Bridge contributors" },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Muse Bridge",
+    "shortDescription": "Let Codex talk to Muse in your browser.",
+    "longDescription": "Find a Muse conversation, send a message, and read its replies using an existing browser session.",
+    "developerName": "Codex Muse Bridge contributors",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": ["Use Muse to help with this task."]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "codex-muse-bridge",
+  "version": "0.1.0",
+  "description": "A small browser-mediated Codex to Muse bridge",
+  "private": true,
+  "main": "scripts/muse-bridge.cjs",
+  "scripts": { "test": "node --test test/*.test.cjs" },
+  "engines": { "node": ">=20" }
+}
