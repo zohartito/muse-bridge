@@ -46,6 +46,13 @@ muse new  "Hello Muse, this is a dedicated agent side chat." --timeout 120
 - Keep one writer per conversation. Do not send while `generating` is true.
 - **One task in flight per thread.** Muse folds a second message into the task it is already running. Observed 2026-09-15: a "reply pong" connectivity ping sent while a fix round was queued became the task "Fix R10-R14 and reply pong"; Muse answered "pong" and logged the fixes as not implemented. While Muse is working, only `wait` and `read`. Put pings and unrelated questions in a separate side chat (`muse new`).
 - Muse's chat goes quiet while it works; its activity panel (right side) is where progress shows. A long silence with no reply is normal for a build round. Check the repo for pushed commits before assuming it stalled.
+- The user may also have the Muse **desktop app** open on the same thread (see below). Anything they type there is a second writer. Before starting a long task, tell them which thread you are driving so they can read without replying in it.
+
+## The Muse desktop app is not an automation target
+
+`/Applications/Muse.app` (`com.meta.endo`) is a native Swift/AppKit app wrapping a WebKit view. Inspected 2026-09-17: no Electron, no remote debugging port, no CLI or automation API, and its `hatch` / `endo-window` URL schemes are internal. Its accessibility tree exposes message text as positioned static-text nodes with no ids, and the composer as an `AXButton` — there is no text field anywhere in the tree, so background typing is refused outright.
+
+Do not try to drive it with screen or accessibility automation. It cannot run headless, it needs its window on the current Space, and it gives no message ids for delta tracking. Keep using this bridge's own browser profile, which reads the real DOM and runs in the background while the user works. The desktop app is the user's window onto the same account and the same threads: what the bridge sends appears there, which makes it the right place for them to watch a run.
 
 ## Judging Muse's output
 
